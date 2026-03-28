@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>My Journal</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     :root {
       --bg: #f5f0eb;
@@ -541,16 +542,18 @@
 
 <script>
   /* ─────────────────────────────────────
+     SUPABASE
+  ───────────────────────────────────── */
+  const { createClient } = supabase;
+  const sb = createClient(
+    'https://culjoqqsvrbhcsiixrtw.supabase.co',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1bGpvcXFzdnJiaGNzaWl4cnR3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2NzgzNjksImV4cCI6MjA5MDI1NDM2OX0.4_6KqoB4j0236NraGj2j_YA1x1qKOm7VY3tV469r7tU'
+  );
+
+  /* ─────────────────────────────────────
      UTILS
   ───────────────────────────────────── */
-  const JOURNAL_KEY = 'journal_entries_v2';
-  const TASKS_KEY   = 'journal_tasks_v2';
-  const THEME_KEY   = 'journal_theme';
-
-  const getEntries = () => JSON.parse(localStorage.getItem(JOURNAL_KEY) || '[]');
-  const setEntries = v => localStorage.setItem(JOURNAL_KEY, JSON.stringify(v));
-  const getTasks   = () => JSON.parse(localStorage.getItem(TASKS_KEY) || '[]');
-  const setTasks   = v => localStorage.setItem(TASKS_KEY, JSON.stringify(v));
+  const THEME_KEY = 'journal_theme';
 
   function todayStr() {
     const n = new Date();
@@ -568,7 +571,6 @@
     setTimeout(() => t.classList.remove('show'), 2400);
   }
 
-  // "28 March" format
   function entryDayLabel(dateStr) {
     const [y, m, d] = dateStr.split('-').map(Number);
     const months = ['January','February','March','April','May','June',
@@ -576,7 +578,6 @@
     return `${d} ${months[m-1]}`;
   }
 
-  // "March 2026" format
   function monthLabel(dateStr) {
     const [y, m] = dateStr.split('-').map(Number);
     const months = ['January','February','March','April','May','June',
@@ -584,7 +585,7 @@
     return `${months[m-1]} ${y}`;
   }
 
-  function monthKey(dateStr) { return dateStr.slice(0, 7); } // "2026-03"
+  function monthKey(dateStr) { return dateStr.slice(0, 7); }
 
   /* ─────────────────────────────────────
      DARK MODE
@@ -597,8 +598,7 @@
   }
 
   function toggleDark() {
-    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    applyTheme(!isDark);
+    applyTheme(document.documentElement.getAttribute('data-theme') !== 'dark');
   }
 
   /* ─────────────────────────────────────
@@ -612,31 +612,54 @@
   }
 
   /* ─────────────────────────────────────
-     JOURNAL
+     JOURNAL — DB helpers
   ───────────────────────────────────── */
-  function saveEntry() {
+  async function fetchEntries() {
+    const { data, error } = await sb
+      .from('journal_entries')
+      .select('*')
+      .order('date', { ascending: true });
+    if (error) { console.error('fetchEntries:', error); return []; }
+    return data;
+  }
+
+  /* ─────────────────────────────────────
+     JOURNAL — actions
+  ───────────────────────────────────── */
+  async function saveEntry() {
     const text = document.getElementById('entryText').value.trim();
     if (!text) { showToast('Write something first.'); return; }
 
     const date = todayStr();
-    const entries = getEntries();
-    const idx = entries.findIndex(e => e.date === date);
 
-    if (idx !== -1) {
-      entries[idx].text = text;
-      entries[idx].updated = new Date().toISOString();
-      showToast('Today\'s entry updated.');
+    // Check if today already has an entry
+    const { data: existing } = await sb
+      .from('journal_entries')
+      .select('id')
+      .eq('date', date)
+      .maybeSingle();
+
+    let savedId;
+    if (existing) {
+      const { error } = await sb
+        .from('journal_entries')
+        .update({ text, updated_at: new Date().toISOString() })
+        .eq('date', date);
+      if (error) { showToast('Error saving — check console.'); console.error(error); return; }
+      savedId = existing.id;
+      showToast("Today's entry updated.");
     } else {
-      entries.push({ id: Date.now(), date, text, created: new Date().toISOString() });
+      savedId = Date.now();
+      const { error } = await sb
+        .from('journal_entries')
+        .insert({ id: savedId, date, text });
+      if (error) { showToast('Error saving — check console.'); console.error(error); return; }
       showToast('Entry saved.');
     }
 
-    const savedId = idx !== -1 ? entries[idx].id : entries[entries.length - 1].id;
-    setEntries(entries);
     document.getElementById('entryText').value = '';
-    renderEntries();
+    await renderEntries();
 
-    // Auto-expand and scroll to the saved entry
     const savedRow = document.querySelector(`.entry-row[data-id="${savedId}"]`);
     if (savedRow) {
       savedRow.classList.add('open');
@@ -644,10 +667,11 @@
     }
   }
 
-  function deleteEntry(id) {
+  async function deleteEntry(id) {
     if (!confirm('Delete this entry?')) return;
-    setEntries(getEntries().filter(e => e.id !== id));
-    renderEntries();
+    const { error } = await sb.from('journal_entries').delete().eq('id', id);
+    if (error) { showToast('Error deleting.'); console.error(error); return; }
+    await renderEntries();
     showToast('Entry deleted.');
   }
 
@@ -657,42 +681,44 @@
   }
 
   function startEdit(id) {
-    const entry = getEntries().find(e => e.id === id);
-    const body = document.querySelector(`.entry-row[data-id="${id}"] .entry-body`);
+    const body    = document.querySelector(`.entry-row[data-id="${id}"] .entry-body`);
     const fullText = body.querySelector('.entry-full-text');
-    const actions = body.querySelector('.entry-body-actions');
+    const actions  = body.querySelector('.entry-body-actions');
 
     fullText.style.display = 'none';
     const ta = document.createElement('textarea');
     ta.className = 'entry-edit-area';
-    ta.value = entry.text;
+    ta.value = fullText.textContent;
     body.insertBefore(ta, actions);
     ta.focus();
 
     actions.innerHTML = `
-      <button class="btn-secondary btn-sm" onclick="cancelEdit(${id})">Cancel</button>
+      <button class="btn-secondary btn-sm" onclick="renderEntries()">Cancel</button>
       <button class="btn-primary btn-sm" onclick="commitEdit(${id})">Save</button>
     `;
   }
 
-  function cancelEdit(id) { renderEntries(); }
-
-  function commitEdit(id) {
+  async function commitEdit(id) {
     const ta = document.querySelector(`.entry-row[data-id="${id}"] .entry-edit-area`);
     const newText = ta.value.trim();
     if (!newText) { showToast('Entry cannot be empty.'); return; }
-    const entries = getEntries();
-    const idx = entries.findIndex(e => e.id === id);
-    entries[idx].text = newText;
-    entries[idx].updated = new Date().toISOString();
-    setEntries(entries);
-    renderEntries();
+
+    const { error } = await sb
+      .from('journal_entries')
+      .update({ text: newText, updated_at: new Date().toISOString() })
+      .eq('id', id);
+    if (error) { showToast('Error saving.'); console.error(error); return; }
+
+    await renderEntries();
     showToast('Entry updated.');
   }
 
-  function renderEntries() {
+  async function renderEntries(preloaded) {
+    const list  = document.getElementById('entryList');
     const query = document.getElementById('searchBar').value.toLowerCase();
-    let entries = getEntries();
+
+    list.innerHTML = '<div class="empty-state">Loading…</div>';
+    let entries = preloaded || await fetchEntries();
 
     if (query) {
       entries = entries.filter(e =>
@@ -702,19 +728,13 @@
       );
     }
 
-    const list = document.getElementById('entryList');
-
     if (entries.length === 0) {
       list.innerHTML = `<div class="empty-state">${query ? 'No entries match your search.' : 'No entries yet. Start writing above.'}</div>`;
       return;
     }
 
-    // Sort oldest → newest so months appear in ascending order, entries within month ascending
-    entries.sort((a, b) => a.date.localeCompare(b.date));
-
-    // Group by month
-    const groups = {};
-    const groupOrder = [];
+    // Group by month (already sorted ascending from DB)
+    const groups = {}, groupOrder = [];
     entries.forEach(e => {
       const mk = monthKey(e.date);
       if (!groups[mk]) { groups[mk] = []; groupOrder.push(mk); }
@@ -740,8 +760,7 @@
                 <button class="btn-danger btn-sm" onclick="deleteEntry(${e.id})">Delete</button>
               </div>
             </div>
-          </div>
-        `;
+          </div>`;
       }).join('');
 
       return `
@@ -751,42 +770,53 @@
             <span class="month-count">${monthEntries.length} ${monthEntries.length === 1 ? 'entry' : 'entries'}</span>
           </div>
           ${rows}
-        </div>
-      `;
+        </div>`;
     }).join('');
   }
 
-  function clearEditor() {
-    document.getElementById('entryText').value = '';
+  function clearEditor() { document.getElementById('entryText').value = ''; }
+
+  /* ─────────────────────────────────────
+     TASKS — DB helpers
+  ───────────────────────────────────── */
+  async function fetchTasks() {
+    const { data, error } = await sb
+      .from('tasks')
+      .select('*')
+      .order('created_at', { ascending: true });
+    if (error) { console.error('fetchTasks:', error); return []; }
+    return data;
   }
 
   /* ─────────────────────────────────────
-     TASKS
+     TASKS — actions
   ───────────────────────────────────── */
-  function addTask() {
+  async function addTask() {
     const input = document.getElementById('taskInput');
-    const text = input.value.trim();
+    const text  = input.value.trim();
     if (!text) return;
 
-    const tasks = getTasks();
-    tasks.push({ id: Date.now(), text, done: false, date: todayStr() });
-    setTasks(tasks);
+    const { error } = await sb
+      .from('tasks')
+      .insert({ id: Date.now(), text, done: false, date: todayStr() });
+    if (error) { showToast('Error adding task.'); console.error(error); return; }
+
     input.value = '';
-    renderTasks();
+    await renderTasks();
     showToast('Task added.');
   }
 
-  function toggleTask(id) {
-    const tasks = getTasks();
-    const idx = tasks.findIndex(t => t.id === id);
-    tasks[idx].done = !tasks[idx].done;
-    setTasks(tasks);
-    renderTasks();
+  async function toggleTask(id) {
+    const { data: existing } = await sb.from('tasks').select('done').eq('id', id).single();
+    const { error } = await sb.from('tasks').update({ done: !existing.done }).eq('id', id);
+    if (error) { console.error(error); return; }
+    await renderTasks();
   }
 
-  function deleteTask(id) {
-    setTasks(getTasks().filter(t => t.id !== id));
-    renderTasks();
+  async function deleteTask(id) {
+    const { error } = await sb.from('tasks').delete().eq('id', id);
+    if (error) { console.error(error); return; }
+    await renderTasks();
   }
 
   function taskItemHtml(t) {
@@ -796,44 +826,40 @@
         <span class="task-text">${escapeHtml(t.text)}</span>
         <span class="task-date">${t.date}</span>
         <button class="task-delete" onclick="deleteTask(${t.id})" title="Delete">✕</button>
-      </div>
-    `;
+      </div>`;
   }
 
-  function renderTasks() {
-    const tasks = getTasks();
-    const todo = tasks.filter(t => !t.done);
-    const done = tasks.filter(t => t.done);
-
+  async function renderTasks() {
     const todoEl = document.getElementById('tasksTodo');
     const doneEl = document.getElementById('tasksDone');
+    todoEl.innerHTML = doneEl.innerHTML = '<div class="tasks-empty">Loading…</div>';
 
-    todoEl.innerHTML = todo.length
-      ? todo.map(taskItemHtml).join('')
-      : '<div class="tasks-empty">No pending tasks.</div>';
+    const tasks = await fetchTasks();
+    const todo  = tasks.filter(t => !t.done);
+    const done  = tasks.filter(t =>  t.done);
 
-    doneEl.innerHTML = done.length
-      ? done.map(taskItemHtml).join('')
-      : '<div class="tasks-empty">Nothing completed yet.</div>';
+    todoEl.innerHTML = todo.length ? todo.map(taskItemHtml).join('') : '<div class="tasks-empty">No pending tasks.</div>';
+    doneEl.innerHTML = done.length ? done.map(taskItemHtml).join('') : '<div class="tasks-empty">Nothing completed yet.</div>';
   }
 
   /* ─────────────────────────────────────
      INIT
   ───────────────────────────────────── */
-  // Theme
-  const savedTheme = localStorage.getItem(THEME_KEY);
-  applyTheme(savedTheme === 'dark');
+  async function init() {
+    applyTheme(localStorage.getItem(THEME_KEY) === 'dark');
 
-  // Header date
-  document.getElementById('headerDate').textContent =
-    new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' });
+    document.getElementById('headerDate').textContent =
+      new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' });
 
-  // Pre-fill today's entry if exists
-  const todayEntry = getEntries().find(e => e.date === todayStr());
-  if (todayEntry) document.getElementById('entryText').value = todayEntry.text;
+    // Load entries, pre-fill editor if today's entry exists
+    const entries = await fetchEntries();
+    const todayEntry = entries.find(e => e.date === todayStr());
+    if (todayEntry) document.getElementById('entryText').value = todayEntry.text;
 
-  renderEntries();
-  renderTasks();
+    await Promise.all([renderEntries(entries), renderTasks()]);
+  }
+
+  init();
 </script>
 </body>
 </html>
