@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Journal</title>
+  <style>
+    :root {
+      --bg: #f5f0eb;
+      --surface: #ffffff;
+      --surface2: #f9f6f2;
+      --border: #e8e2db;
+      --text: #2c2c2c;
+      --text-muted: #888;
+      --text-faint: #bbb;
+      --accent: #2c2c2c;
+      --accent-text: #f5f0eb;
+      --header-bg: #2c2c2c;
+      --header-text: #f5f0eb;
+      --danger: #c0392b;
+      --danger-border: #f5c6c2;
+      --month-bg: #f0ebe4;
+      --tab-active-bg: #2c2c2c;
+      --tab-active-text: #f5f0eb;
+      --shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+
+    [data-theme="dark"] {
+      --bg: #1a1a1a;
+      --surface: #242424;
+      --surface2: #2a2a2a;
+      --border: #333;
+      --text: #e8e2db;
+      --text-muted: #888;
+      --text-faint: #555;
+      --accent: #e8e2db;
+      --accent-text: #1a1a1a;
+      --header-bg: #111;
+      --header-text: #e8e2db;
+      --danger: #e05c4b;
+      --danger-border: #5a2a24;
+      --month-bg: #1f1f1f;
+      --tab-active-bg: #e8e2db;
+      --tab-active-text: #1a1a1a;
+      --shadow: 0 1px 4px rgba(0,0,0,0.4);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Georgia', serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--header-bg);
+      color: var(--header-text);
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    header h1 {
+      font-size: 1.4rem;
+      font-weight: normal;
+      letter-spacing: 1px;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .header-date {
+      font-size: 0.8rem;
+      opacity: 0.5;
+      font-family: monospace;
+    }
+
+    /* Dark mode toggle */
+    .dark-toggle {
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.2);
+      color: var(--header-text);
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 0.78rem;
+      font-family: 'Georgia', serif;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+    .dark-toggle:hover { background: rgba(255,255,255,0.1); opacity: 1; }
+
+    /* ── Mode tabs ── */
+    .mode-tabs {
+      display: flex;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+      padding: 0 32px;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      border-bottom: 3px solid transparent;
+      color: var(--text-muted);
+      font-family: 'Georgia', serif;
+      font-size: 0.85rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 14px 20px;
+      cursor: pointer;
+      margin-bottom: -1px;
+      transition: color 0.15s, border-color 0.15s;
+    }
+
+    .tab-btn:hover { color: var(--text); opacity: 1; }
+
+    .tab-btn.active {
+      color: var(--text);
+      border-bottom-color: var(--text);
+    }
+
+    /* ── Container ── */
+    .container { max-width: 820px; margin: 0 auto; padding: 36px 20px; }
+
+    /* ── Mode panels ── */
+    .mode-panel { display: none; }
+    .mode-panel.active { display: block; }
+
+    /* ── Write section ── */
+    .write-section {
+      background: var(--surface);
+      border-radius: 6px;
+      padding: 28px;
+      box-shadow: var(--shadow);
+      margin-bottom: 36px;
+      border: 1px solid var(--border);
+    }
+
+    .section-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 1.8px;
+      color: var(--text-muted);
+      margin-bottom: 14px;
+    }
+
+    .write-section textarea {
+      width: 100%;
+      min-height: 180px;
+      border: none;
+      resize: vertical;
+      font-family: 'Georgia', serif;
+      font-size: 1rem;
+      line-height: 1.85;
+      color: var(--text);
+      outline: none;
+      background: transparent;
+    }
+
+    .write-section textarea::placeholder { color: var(--text-faint); }
+
+    .divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 16px 0;
+    }
+
+    .write-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    /* ── Buttons ── */
+    button { cursor: pointer; border: none; border-radius: 4px; font-family: 'Georgia', serif; transition: opacity 0.15s; }
+    button:hover { opacity: 0.75; }
+
+    .btn-primary { background: var(--accent); color: var(--accent-text); font-size: 0.9rem; padding: 9px 22px; }
+    .btn-secondary { background: transparent; color: var(--text-muted); border: 1px solid var(--border); font-size: 0.9rem; padding: 9px 18px; }
+    .btn-sm { font-size: 0.78rem; padding: 4px 12px; }
+    .btn-danger { background: transparent; color: var(--danger); border: 1px solid var(--danger-border); }
+    .btn-ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--border); }
+
+    /* ── Month groups ── */
+    .month-group { margin-bottom: 32px; }
+
+    .month-heading {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: var(--text-muted);
+      padding: 8px 14px;
+      background: var(--month-bg);
+      border-radius: 4px;
+      margin-bottom: 10px;
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .month-heading .month-count { font-size: 0.7rem; color: var(--text-faint); }
+
+    /* ── Entry rows (compact list) ── */
+    .entry-row {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      margin-bottom: 6px;
+      overflow: hidden;
+    }
+
+    .entry-row-header {
+      display: flex;
+      align-items: center;
+      padding: 12px 16px;
+      cursor: pointer;
+      gap: 14px;
+      user-select: none;
+    }
+
+    .entry-row-header:hover { background: var(--surface2); }
+
+    .entry-day {
+      font-size: 0.95rem;
+      font-weight: normal;
+      color: var(--text);
+      min-width: 110px;
+    }
+
+    .entry-preview-text {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      flex: 1;
+    }
+
+    .entry-chevron {
+      color: var(--text-faint);
+      font-size: 0.75rem;
+      transition: transform 0.2s;
+      flex-shrink: 0;
+    }
+
+    .entry-row.open .entry-chevron { transform: rotate(90deg); }
+
+    .entry-body {
+      display: none;
+      padding: 16px 16px 14px;
+      border-top: 1px solid var(--border);
+    }
+
+    .entry-row.open .entry-body { display: block; }
+
+    .entry-full-text {
+      font-size: 0.97rem;
+      line-height: 1.85;
+      color: var(--text);
+      white-space: pre-wrap;
+      margin-bottom: 14px;
+    }
+
+    .entry-body-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+    .entry-edit-area {
+      width: 100%;
+      min-height: 120px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 10px;
+      margin-bottom: 10px;
+      resize: vertical;
+      font-family: 'Georgia', serif;
+      font-size: 0.97rem;
+      line-height: 1.85;
+      color: var(--text);
+      background: var(--surface2);
+      outline: none;
+    }
+
+    /* ── Search ── */
+    .entries-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+      gap: 12px;
+    }
+
+    .entries-title {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 1.8px;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    .search-bar {
+      flex: 1;
+      max-width: 260px;
+      padding: 7px 12px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-family: 'Georgia', serif;
+      font-size: 0.85rem;
+      background: var(--surface);
+      color: var(--text);
+      outline: none;
+    }
+
+    .search-bar:focus { border-color: var(--text-muted); }
+    .search-bar::placeholder { color: var(--text-faint); }
+
+    /* ── Empty state ── */
+    .empty-state {
+      text-align: center;
+      padding: 50px 20px;
+      color: var(--text-faint);
+      font-size: 0.95rem;
+    }
+
+    /* ════════════════════════════════
+       TASKS PANEL
+    ════════════════════════════════ */
+    .task-input-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 28px;
+    }
+
+    .task-input {
+      flex: 1;
+      padding: 11px 14px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-family: 'Georgia', serif;
+      font-size: 0.95rem;
+      background: var(--surface);
+      color: var(--text);
+      outline: none;
+    }
+
+    .task-input:focus { border-color: var(--text-muted); }
+    .task-input::placeholder { color: var(--text-faint); }
+
+    .task-sections { display: flex; flex-direction: column; gap: 28px; }
+
+    .task-section-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 1.8px;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+    }
+
+    .task-list { display: flex; flex-direction: column; gap: 6px; }
+
+    .task-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .task-item.done { opacity: 0.5; }
+    .task-item.done .task-text { text-decoration: line-through; }
+
+    .task-checkbox {
+      width: 17px;
+      height: 17px;
+      border: 1.5px solid var(--border);
+      border-radius: 3px;
+      cursor: pointer;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      transition: background 0.15s, border-color 0.15s;
+      padding: 0;
+    }
+
+    .task-checkbox.checked {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .task-checkbox.checked::after {
+      content: '✓';
+      color: var(--accent-text);
+      font-size: 11px;
+      line-height: 1;
+    }
+
+    .task-text {
+      flex: 1;
+      font-size: 0.95rem;
+      color: var(--text);
+      font-family: 'Georgia', serif;
+    }
+
+    .task-date {
+      font-size: 0.72rem;
+      color: var(--text-faint);
+      font-family: monospace;
+      white-space: nowrap;
+    }
+
+    .task-delete {
+      background: transparent;
+      border: none;
+      color: var(--text-faint);
+      font-size: 1rem;
+      padding: 0 4px;
+      cursor: pointer;
+      line-height: 1;
+      transition: color 0.15s;
+    }
+    .task-delete:hover { color: var(--danger); opacity: 1; }
+
+    .tasks-empty {
+      text-align: center;
+      padding: 30px;
+      color: var(--text-faint);
+      font-size: 0.9rem;
+    }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed;
+      bottom: 28px;
+      right: 28px;
+      background: var(--accent);
+      color: var(--accent-text);
+      padding: 10px 20px;
+      border-radius: 4px;
+      font-size: 0.84rem;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: all 0.25s;
+      pointer-events: none;
+      font-family: 'Georgia', serif;
+      z-index: 200;
+    }
+
+    .toast.show { opacity: 1; transform: translateY(0); }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ── -->
+<header>
+  <h1>My Journal</h1>
+  <div class="header-right">
+    <span class="header-date" id="headerDate"></span>
+    <button class="dark-toggle" id="darkToggle" onclick="toggleDark()">
+      <span id="darkIcon">☾</span>
+      <span id="darkLabel">Dark</span>
+    </button>
+  </div>
+</header>
+
+<!-- ── Mode tabs ── -->
+<div class="mode-tabs">
+  <button class="tab-btn active" id="tab-journal" onclick="switchMode('journal')">Journal</button>
+  <button class="tab-btn" id="tab-tasks" onclick="switchMode('tasks')">Tasks</button>
+</div>
+
+<!-- ══════════════════════════════════
+     JOURNAL PANEL
+══════════════════════════════════ -->
+<div class="mode-panel active" id="panel-journal">
+  <div class="container">
+
+    <!-- Write -->
+    <div class="write-section">
+      <div class="section-label">New Entry</div>
+      <textarea id="entryText" placeholder="What's on your mind today?"></textarea>
+      <hr class="divider">
+      <div class="write-actions">
+        <button class="btn-secondary" onclick="clearEditor()">Clear</button>
+        <button class="btn-primary" onclick="saveEntry()">Save Entry</button>
+      </div>
+    </div>
+
+    <!-- Entries list -->
+    <div class="entries-toolbar">
+      <span class="entries-title">Entries</span>
+      <input type="text" class="search-bar" id="searchBar" placeholder="Search…" oninput="renderEntries()">
+    </div>
+
+    <div id="entryList"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+     TASKS PANEL
+══════════════════════════════════ -->
+<div class="mode-panel" id="panel-tasks">
+  <div class="container">
+
+    <div class="task-input-row">
+      <input type="text" class="task-input" id="taskInput" placeholder="Add a task…" onkeydown="if(event.key==='Enter') addTask()">
+      <button class="btn-primary" onclick="addTask()">Add</button>
+    </div>
+
+    <div class="task-sections">
+      <div>
+        <div class="task-section-label">To Do</div>
+        <div class="task-list" id="tasksTodo"></div>
+      </div>
+      <div>
+        <div class="task-section-label">Completed</div>
+        <div class="task-list" id="tasksDone"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  /* ─────────────────────────────────────
+     UTILS
+  ───────────────────────────────────── */
+  const JOURNAL_KEY = 'journal_entries_v2';
+  const TASKS_KEY   = 'journal_tasks_v2';
+  const THEME_KEY   = 'journal_theme';
+
+  const getEntries = () => JSON.parse(localStorage.getItem(JOURNAL_KEY) || '[]');
+  const setEntries = v => localStorage.setItem(JOURNAL_KEY, JSON.stringify(v));
+  const getTasks   = () => JSON.parse(localStorage.getItem(TASKS_KEY) || '[]');
+  const setTasks   = v => localStorage.setItem(TASKS_KEY, JSON.stringify(v));
+
+  function todayStr() {
+    const n = new Date();
+    return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`;
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2400);
+  }
+
+  // "28 March" format
+  function entryDayLabel(dateStr) {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const months = ['January','February','March','April','May','June',
+                    'July','August','September','October','November','December'];
+    return `${d} ${months[m-1]}`;
+  }
+
+  // "March 2026" format
+  function monthLabel(dateStr) {
+    const [y, m] = dateStr.split('-').map(Number);
+    const months = ['January','February','March','April','May','June',
+                    'July','August','September','October','November','December'];
+    return `${months[m-1]} ${y}`;
+  }
+
+  function monthKey(dateStr) { return dateStr.slice(0, 7); } // "2026-03"
+
+  /* ─────────────────────────────────────
+     DARK MODE
+  ───────────────────────────────────── */
+  function applyTheme(dark) {
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+    document.getElementById('darkIcon').textContent  = dark ? '☀' : '☾';
+    document.getElementById('darkLabel').textContent = dark ? 'Light' : 'Dark';
+    localStorage.setItem(THEME_KEY, dark ? 'dark' : 'light');
+  }
+
+  function toggleDark() {
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    applyTheme(!isDark);
+  }
+
+  /* ─────────────────────────────────────
+     MODE TABS
+  ───────────────────────────────────── */
+  function switchMode(mode) {
+    ['journal','tasks'].forEach(m => {
+      document.getElementById(`tab-${m}`).classList.toggle('active', m === mode);
+      document.getElementById(`panel-${m}`).classList.toggle('active', m === mode);
+    });
+  }
+
+  /* ─────────────────────────────────────
+     JOURNAL
+  ───────────────────────────────────── */
+  function saveEntry() {
+    const text = document.getElementById('entryText').value.trim();
+    if (!text) { showToast('Write something first.'); return; }
+
+    const date = todayStr();
+    const entries = getEntries();
+    const idx = entries.findIndex(e => e.date === date);
+
+    if (idx !== -1) {
+      entries[idx].text = text;
+      entries[idx].updated = new Date().toISOString();
+      showToast('Today\'s entry updated.');
+    } else {
+      entries.push({ id: Date.now(), date, text, created: new Date().toISOString() });
+      showToast('Entry saved.');
+    }
+
+    const savedId = idx !== -1 ? entries[idx].id : entries[entries.length - 1].id;
+    setEntries(entries);
+    document.getElementById('entryText').value = '';
+    renderEntries();
+
+    // Auto-expand and scroll to the saved entry
+    const savedRow = document.querySelector(`.entry-row[data-id="${savedId}"]`);
+    if (savedRow) {
+      savedRow.classList.add('open');
+      savedRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }
+
+  function deleteEntry(id) {
+    if (!confirm('Delete this entry?')) return;
+    setEntries(getEntries().filter(e => e.id !== id));
+    renderEntries();
+    showToast('Entry deleted.');
+  }
+
+  function toggleEntryOpen(id) {
+    const row = document.querySelector(`.entry-row[data-id="${id}"]`);
+    if (row) row.classList.toggle('open');
+  }
+
+  function startEdit(id) {
+    const entry = getEntries().find(e => e.id === id);
+    const body = document.querySelector(`.entry-row[data-id="${id}"] .entry-body`);
+    const fullText = body.querySelector('.entry-full-text');
+    const actions = body.querySelector('.entry-body-actions');
+
+    fullText.style.display = 'none';
+    const ta = document.createElement('textarea');
+    ta.className = 'entry-edit-area';
+    ta.value = entry.text;
+    body.insertBefore(ta, actions);
+    ta.focus();
+
+    actions.innerHTML = `
+      <button class="btn-secondary btn-sm" onclick="cancelEdit(${id})">Cancel</button>
+      <button class="btn-primary btn-sm" onclick="commitEdit(${id})">Save</button>
+    `;
+  }
+
+  function cancelEdit(id) { renderEntries(); }
+
+  function commitEdit(id) {
+    const ta = document.querySelector(`.entry-row[data-id="${id}"] .entry-edit-area`);
+    const newText = ta.value.trim();
+    if (!newText) { showToast('Entry cannot be empty.'); return; }
+    const entries = getEntries();
+    const idx = entries.findIndex(e => e.id === id);
+    entries[idx].text = newText;
+    entries[idx].updated = new Date().toISOString();
+    setEntries(entries);
+    renderEntries();
+    showToast('Entry updated.');
+  }
+
+  function renderEntries() {
+    const query = document.getElementById('searchBar').value.toLowerCase();
+    let entries = getEntries();
+
+    if (query) {
+      entries = entries.filter(e =>
+        e.text.toLowerCase().includes(query) ||
+        entryDayLabel(e.date).toLowerCase().includes(query) ||
+        monthLabel(e.date).toLowerCase().includes(query)
+      );
+    }
+
+    const list = document.getElementById('entryList');
+
+    if (entries.length === 0) {
+      list.innerHTML = `<div class="empty-state">${query ? 'No entries match your search.' : 'No entries yet. Start writing above.'}</div>`;
+      return;
+    }
+
+    // Sort oldest → newest so months appear in ascending order, entries within month ascending
+    entries.sort((a, b) => a.date.localeCompare(b.date));
+
+    // Group by month
+    const groups = {};
+    const groupOrder = [];
+    entries.forEach(e => {
+      const mk = monthKey(e.date);
+      if (!groups[mk]) { groups[mk] = []; groupOrder.push(mk); }
+      groups[mk].push(e);
+    });
+
+    list.innerHTML = groupOrder.map(mk => {
+      const monthEntries = groups[mk];
+      const label = monthLabel(monthEntries[0].date);
+      const rows = monthEntries.map(e => {
+        const preview = e.text.replace(/\n/g, ' ').slice(0, 80) + (e.text.length > 80 ? '…' : '');
+        return `
+          <div class="entry-row" data-id="${e.id}">
+            <div class="entry-row-header" onclick="toggleEntryOpen(${e.id})">
+              <span class="entry-day">${entryDayLabel(e.date)}</span>
+              <span class="entry-preview-text">${escapeHtml(preview)}</span>
+              <span class="entry-chevron">▶</span>
+            </div>
+            <div class="entry-body">
+              <div class="entry-full-text">${escapeHtml(e.text)}</div>
+              <div class="entry-body-actions">
+                <button class="btn-ghost btn-sm" onclick="startEdit(${e.id})">Edit</button>
+                <button class="btn-danger btn-sm" onclick="deleteEntry(${e.id})">Delete</button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      return `
+        <div class="month-group">
+          <div class="month-heading">
+            <span>${label}</span>
+            <span class="month-count">${monthEntries.length} ${monthEntries.length === 1 ? 'entry' : 'entries'}</span>
+          </div>
+          ${rows}
+        </div>
+      `;
+    }).join('');
+  }
+
+  function clearEditor() {
+    document.getElementById('entryText').value = '';
+  }
+
+  /* ─────────────────────────────────────
+     TASKS
+  ───────────────────────────────────── */
+  function addTask() {
+    const input = document.getElementById('taskInput');
+    const text = input.value.trim();
+    if (!text) return;
+
+    const tasks = getTasks();
+    tasks.push({ id: Date.now(), text, done: false, date: todayStr() });
+    setTasks(tasks);
+    input.value = '';
+    renderTasks();
+    showToast('Task added.');
+  }
+
+  function toggleTask(id) {
+    const tasks = getTasks();
+    const idx = tasks.findIndex(t => t.id === id);
+    tasks[idx].done = !tasks[idx].done;
+    setTasks(tasks);
+    renderTasks();
+  }
+
+  function deleteTask(id) {
+    setTasks(getTasks().filter(t => t.id !== id));
+    renderTasks();
+  }
+
+  function taskItemHtml(t) {
+    return `
+      <div class="task-item${t.done ? ' done' : ''}">
+        <button class="task-checkbox${t.done ? ' checked' : ''}" onclick="toggleTask(${t.id})"></button>
+        <span class="task-text">${escapeHtml(t.text)}</span>
+        <span class="task-date">${t.date}</span>
+        <button class="task-delete" onclick="deleteTask(${t.id})" title="Delete">✕</button>
+      </div>
+    `;
+  }
+
+  function renderTasks() {
+    const tasks = getTasks();
+    const todo = tasks.filter(t => !t.done);
+    const done = tasks.filter(t => t.done);
+
+    const todoEl = document.getElementById('tasksTodo');
+    const doneEl = document.getElementById('tasksDone');
+
+    todoEl.innerHTML = todo.length
+      ? todo.map(taskItemHtml).join('')
+      : '<div class="tasks-empty">No pending tasks.</div>';
+
+    doneEl.innerHTML = done.length
+      ? done.map(taskItemHtml).join('')
+      : '<div class="tasks-empty">Nothing completed yet.</div>';
+  }
+
+  /* ─────────────────────────────────────
+     INIT
+  ───────────────────────────────────── */
+  // Theme
+  const savedTheme = localStorage.getItem(THEME_KEY);
+  applyTheme(savedTheme === 'dark');
+
+  // Header date
+  document.getElementById('headerDate').textContent =
+    new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' });
+
+  // Pre-fill today's entry if exists
+  const todayEntry = getEntries().find(e => e.date === todayStr());
+  if (todayEntry) document.getElementById('entryText').value = todayEntry.text;
+
+  renderEntries();
+  renderTasks();
+</script>
+</body>
+</html>
